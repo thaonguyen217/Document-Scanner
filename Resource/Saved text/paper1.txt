@@ -1,0 +1,14 @@
+( )
+
+MURTAZA'S
+
+woRKS HOP
+
+DOCUMENT SCANNER
+USING OPENCV
+
+Keywords
+Opency, Python, Contours, Corner Detection,
+Thresholding, Edge Detection, Webcam Feed,
+Warp Prespective, GrayScale, Image Stacking.
+

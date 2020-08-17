@@ -5,8 +5,14 @@ import numpy as np
 import pytesseract
 import os
 ########################################################################################################
-width = 540
-height = 640
+width, height = 640, 540
+color1 = (81, 57, 33) # xanh
+color2 = (106, 129, 207) # hong
+lang = 'eng'
+path = 'Resource/paper1.jpg'
+size1 = (480, 640)
+size2 = (540, 720)
+h_min, h_max, s_min, s_max, v_min, v_max = 0, 179, 0, 255, 180, 255
 ########################################################################################################
 
 def stackImages(scale,imgArray):
@@ -47,7 +53,7 @@ def preProcessing(img):
     kernel = np.ones((5,5))
     imgDial = cv2.dilate(imgCanny,kernel,iterations=2)
     imgThres = cv2.erode(imgDial,kernel,iterations=1)
-    return imgThres
+    return imgThres, imgGray, imgCanny
 
 def getContours(img):
     contours, Hierarchy = cv2.findContours(img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
@@ -55,17 +61,16 @@ def getContours(img):
     biggest = np.array([])
     for cnt in contours:
         area = cv2.contourArea(cnt)
-        if area > 6000:
-            cv2.drawContours(imgContours, cnt, -1, (255, 0, 255), 30)  # contour index = -1: draw all the contours
+        if area > 60000:
+            cv2.drawContours(imgContours, cnt, -1, color2, 5)  # contour index = -1: draw all the contours
             peri = cv2.arcLength(cnt, True)
             approx = cv2.approxPolyDP(cnt, 0.02 * peri, True)
 
             if len(approx) == 4 and area > maxArea:
                 maxArea = area
                 biggest = approx
-                x, y, w, h = cv2.boundingRect(approx)
 
-        cv2.drawContours(imgContours, biggest, -1, (255, 255, 0), 100) # contour index = -1: draw all the contours
+        cv2.drawContours(imgContours, biggest, -1, color1, 20) # contour index = -1: draw all the contours
     return biggest
 
 def reoder(biggest):
@@ -91,26 +96,23 @@ def wrap(img, biggest):
         imgWrap = img
     return imgWrap
 
-########################### USING IMAGE ###########################
-img = cv2.imread('Resource/book.jpg')
-
+img = cv2.imread(path)
+img = cv2.resize(img, size1)
 # Wrap image
-imgThres = preProcessing(img)
+imgThres, imgGray, imgCanny = preProcessing(img)
 imgContours = img.copy()
-imgGray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-imgBlur = cv2.GaussianBlur(imgGray, (5, 5), sigmaX=1, sigmaY=1)
-imgCanny = cv2.Canny(imgBlur, 50, 100)
-biggest = getContours(imgCanny)
+biggest = getContours(imgThres)
 imgWrap = wrap(img, biggest)
-path = 'Resource/Saved image/book.jpg'
-if os.path.exists(path) == False:
-    cv2.imwrite(path, imgWrap)
+name = path.split('/')
+name1 = name[1]
+path1 = os.path.join('Resource/Saved image', name1)
+if os.path.exists(path1) == False:
+    cv2.imwrite(path1, imgWrap)
 
 #------------------------ APPLY TO IMAGE ------------------------
 
 # Color detection
 imgHSV = cv2.cvtColor(imgWrap, cv2.COLOR_BGR2HSV)
-h_min, h_max, s_min, s_max, v_min, v_max = 0, 179, 0, 255, 192, 255
 lower = np.array([h_min, s_min, v_min])
 upper = np.array([h_max, s_max, v_max])
 mask = cv2.inRange(imgHSV, lower, upper)
@@ -120,9 +122,12 @@ imgResult = cv2.bitwise_and(imgWrap, imgWrap, mask=mask)
 imgText = cv2.cvtColor(imgWrap, cv2.COLOR_BGR2RGB)
 string = pytesseract.image_to_string(imgText)
 print('String: ', string)
-path = 'Resource/Saved text/book.txt'
-if os.path.exists(path) == False:
-    f = open(path, 'x')
+
+name2 = name1.split('.')
+name2 = name2[0] + '.txt'
+path2 = os.path.join('Resource/Saved text', name2)
+if os.path.exists(path2) == False:
+    f = open(path2, 'x')
     f.write(string)
     f.close()
 
@@ -131,19 +136,19 @@ hImg, wImg, _ = imgText.shape
 # if you only want to regconize numbers:
 # cong = r'--oem 3 --psm 6 outputbase digits'
 # boxes = pytesseract.image_to_data(imgText, lang='eng', config=cong)
-boxes = pytesseract.image_to_data(imgText, lang='eng')
+boxes = pytesseract.image_to_data(imgText, lang=lang)
 for i, box in enumerate(boxes.splitlines()):
     box = box.split()
     # print(box)
     if i != 0 and len(box) == 12:
         x, y, w, h = int(box[6]), int(box[7]), int(box[8]), int(box[9])
-        cv2.rectangle(imgResult, (x, y), (w+x, h+y), color=(255, 255, 0), thickness=1)
+        cv2.rectangle(imgResult, (x, y), (w+x, h+y), color=(225, 225, 0), thickness=1)
         # cv2.putText(imgResult, box[11], (x, y + 30), cv2.FONT_ITALIC,
                     # fontScale=0.4, color=(0, 0, 0), thickness=1)
 
 # Display
-imgStack = stackImages(0.2, ([img, imgGray, imgCanny, imgThres], [imgContours, imgWrap, imgText, imgResult]))
+imgStack = stackImages(0.6, ([img, imgGray, imgCanny, imgThres], [imgContours, imgWrap, mask, imgResult]))
 cv2.imshow('Work flow', imgStack)
-imgText = cv2.resize(imgText, (540, 720))
+imgResult = cv2.resize(imgResult, size2)
 cv2.imshow('Result', imgResult)
 cv2.waitKey(0)
